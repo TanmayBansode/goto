@@ -59,6 +59,24 @@ function Add-Bookmark {
     }
 }
 
+function Set-As-Bookmark {
+    param ($name)
+    $bookmarks = Load-Bookmarks
+    if ($bookmarks.ContainsKey($name)) {
+        Write-Host "Bookmark '$name' already exists. Use 'hop remove $name' to remove it." -ForegroundColor Red
+        return
+    }
+
+    $bookmarks[$name] = @{
+        Path         = (Get-Location).Path
+        Category     = "general"
+        LastAccessed = ""
+        AccessCount  = 0
+    }
+    Save-Bookmarks $bookmarks
+    Write-Host "Current location set as bookmark '$name' at $(Get-Location).Path" -ForegroundColor Green
+}
+
 function Go-To-Bookmark {
     param ($name)
     $bookmarks = Load-Bookmarks
@@ -161,7 +179,8 @@ function Remove-Bookmark {
 
 function Show-Help {
     Write-Host " Usage:" -ForegroundColor Green
-    Write-Host "  hop add <name> <path> <category>  - Adds a bookmark (default category: general)" -ForegroundColor White
+    Write-Host "  hop add <name> <path> <category> - Adds a bookmark (default category: general)" -ForegroundColor White
+    Write-Host "  hop set <name>                   - Sets current location as a bookmark" -ForegroundColor White
     Write-Host "  hop to <name>                    - Goes to the saved bookmark" -ForegroundColor White
     Write-Host "  hop list <word>                  - Lists bookmarks with optional search word" -ForegroundColor White
     Write-Host "  hop list -c <category>           - Lists bookmarks in a specific category" -ForegroundColor White
@@ -181,6 +200,9 @@ elseif ($args[0] -eq "help") {
 }
 elseif ($args[0] -eq "add" -and $args[1] -and $args[2]) {
     Add-Bookmark -name $args[1] -path $args[2] -category $args[3] 
+}
+elseif ($args[0] -eq "set" -and $args[1]) {
+    Set-As-Bookmark -name $args[1]
 }
 elseif ($args[0] -eq "to" -and $args[1]) {
     Go-To-Bookmark -name $args[1]
