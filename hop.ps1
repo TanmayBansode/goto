@@ -60,7 +60,12 @@ function Add-Bookmark {
 }
 
 function Set-As-Bookmark {
-    param ($name)
+    param ($name, $category)
+
+    if (!$category) {
+        $category = "general"
+    }
+
     $bookmarks = Load-Bookmarks
     if ($bookmarks.ContainsKey($name)) {
         Write-Host "Bookmark '$name' already exists. Use 'hop remove $name' to remove it." -ForegroundColor Red
@@ -69,12 +74,63 @@ function Set-As-Bookmark {
 
     $bookmarks[$name] = @{
         Path         = (Get-Location).Path
-        Category     = "general"
+        Category     = $category
         LastAccessed = ""
         AccessCount  = 0
     }
     Save-Bookmarks $bookmarks
-    Write-Host "Current location set as bookmark '$name' at $(Get-Location).Path" -ForegroundColor Green
+    Write-Host "Current location set as bookmark '$name' under category '$category' at $((Get-Location).Path)" -ForegroundColor Green
+}
+
+function Rename-Bookmark {
+    param (
+        $oldName,
+        $newName,
+        [switch]$Category,
+        $newCategory
+    )
+    
+    $bookmarks = Load-Bookmarks
+    if (!$oldName) {
+        Write-Host "Error: Specify the old bookmark name.'$oldName'" -ForegroundColor Red
+        return
+    }
+    if ((!$newName) -and (!$newCategory)) {
+        Write-Host "Error: Specify either a new name or a new category." -ForegroundColor Red
+        return
+    }
+    
+    if (-not $bookmarks.ContainsKey($oldName)) {
+        Write-Host "Bookmark '$oldName' not found." -ForegroundColor Red
+        return
+    }
+    
+    if ($newName) {
+        if ($bookmarks.ContainsKey($newName)) {
+            Write-Host "Bookmark '$newName' already exists. Choose a different name." -ForegroundColor Red
+            return
+        }
+        
+        $bookmarks[$newName] = $bookmarks[$oldName]
+        $bookmarks.Remove($oldName)
+    }
+    
+    if ($Category) {
+        $targetName = if ($newName) { $newName } else { $oldName }
+        $bookmarks[$targetName].Category = $newCategory
+    }
+    
+    Save-Bookmarks $bookmarks
+    
+    if ($newName -and $Category) {
+        Write-Host "Bookmark '$oldName' renamed to '$newName' with new category '$newCategory'." -ForegroundColor Green
+    }
+    elseif ($newName) {
+        Write-Host "Bookmark '$oldName' renamed to '$newName'." -ForegroundColor Green
+    }
+    elseif ($Category) {
+        Write-Host "Category for bookmark '$oldName' changed to '$newCategory'." -ForegroundColor Green
+    }
 }
 
 function Go-To-Bookmark {
@@ -183,6 +239,8 @@ function Show-Help {
     Write-Host "  hop set <name>                   - Sets current location as a bookmark" -ForegroundColor White
     Write-Host "  hop to <name>                    - Goes to the saved bookmark" -ForegroundColor White
     Write-Host "  hop list <word>                  - Lists bookmarks with optional search word" -ForegroundColor White
+    Write-Host "  hop rename <oldname> <newname> -c <category>
+                                   - Renames name and/or category" -ForegroundColor White
     Write-Host "  hop list -c <category>           - Lists bookmarks in a specific category" -ForegroundColor White
     Write-Host "  hop stats                        - Displays detailed bookmark stats" -ForegroundColor White
     Write-Host "  hop recent                       - Displays last 10 accessed bookmarks" -ForegroundColor White
@@ -191,45 +249,109 @@ function Show-Help {
     Write-Host "  hop clear                        - Clears all bookmarks" -ForegroundColor White
     Write-Host "  hop help                         - Displays this help" -ForegroundColor White
 }
+# Enhanced switch case with more robust error handling
+switch ($args[0]) {
+    { $_ -eq $null } { Show-Help }
+    "help" { Show-Help }
+    "add" { 
+        if ($args.Length -ge 3) {
+            try {
+                Add-Bookmark -name $args[1] -path $args[2] -category $args[3] 
+            }
+            catch {
+                Write-Host "Error adding bookmark: $_" -ForegroundColor Red
+            }
+        }
+        else {
+            Write-Host "Usage: hop add <name> <path> [<category>]" -ForegroundColor Yellow
+        }
+    }
+    "set" { 
+        if ($args.Length -ge 2) {
+            try {
+                Set-As-Bookmark -name $args[1] -category $args[2]
+            }
+            catch {
+                Write-Host "Error setting bookmark: $_" -ForegroundColor Red
+            }
+        }
+        else {
+            Write-Host "Usage: hop set <name> [<category>]" -ForegroundColor Yellow
+        }
+    }
+    "to" { 
+        if ($args.Length -ge 2) {
+            try {
+                Go-To-Bookmark -name $args[1]
+            }
+            catch {
+                Write-Host "Error navigating to bookmark: $_" -ForegroundColor Red
+            }
+        }
+        else {
+            Write-Host "Usage: hop to <name>" -ForegroundColor Yellow
+        }
+    }
+    "list" {
+        try {
+            if ($args[1] -eq "-c" -and $args[2]) {
+                List-Bookmarks -category $args[2]
+            }
+            else {
+                List-Bookmarks $args[1]
+            }
+        }
+        catch {
+            Write-Host "Error listing bookmarks: $_" -ForegroundColor Red
+        }
+    }
+    "stats" { Show-Stats }
+    "recent" { Show-Recent }
+    "frequent" { Show-Frequent }
+    "remove" { 
+        if ($args.Length -ge 2) {
+            try {
+                Remove-Bookmark -name $args[1]
+            }
+            catch {
+                Write-Host "Error removing bookmark: $_" -ForegroundColor Red
+            }
+        }
+        else {
+            Write-Host "Usage: hop remove <name>" -ForegroundColor Yellow
+        }
+    }
+    "clear" { Clear-Bookmarks }
+    "rename" { 
+        $oldName = $args[1]
 
-if ($args.Length -eq 0) {
-    Show-Help
-}
-elseif ($args[0] -eq "help") {
-    Show-Help
-}
-elseif ($args[0] -eq "add" -and $args[1] -and $args[2]) {
-    Add-Bookmark -name $args[1] -path $args[2] -category $args[3] 
-}
-elseif ($args[0] -eq "set" -and $args[1]) {
-    Set-As-Bookmark -name $args[1]
-}
-elseif ($args[0] -eq "to" -and $args[1]) {
-    Go-To-Bookmark -name $args[1]
-}
-elseif ($args[0] -eq "list") {
-    if ($args[1] -eq "-c" -and $args[2]) {
-        List-Bookmarks -category $args[2]
+        if ($args.Contains("-c")) {
+            # If "-c" is present, get newName (if available) and newCategory
+            $newName = if ($args[2] -ne "-c") { $args[2] } elseif ($args[4]) { $args[4] } else { $null }
+            $newCategory = $args[$args.IndexOf("-c") + 1]
+        } 
+        else {
+            # If "-c" is not present, treat the second argument as newName
+            $newName = $args[2]
+            $newCategory = $null
+        }
+
+        # Validate oldName and call Rename-Bookmark with relevant arguments
+        if ($oldName) {
+            try {
+                Rename-Bookmark -oldName $oldName -newName $newName -Category:($newCategory -ne $null) -newCategory $newCategory
+            }
+            catch {
+                Write-Host "Error renaming bookmark: $_" -ForegroundColor Red
+            }
+        }
+        else {
+            Write-Host "Please specify at least an old name for the bookmark." -ForegroundColor Red
+        }
     }
-    else {
-        List-Bookmarks $args[1]
+    default { 
+        Write-Host "Unknown command. Use 'hop help' for instructions." -ForegroundColor Red 
     }
 }
-elseif ($args[0] -eq "stats") {
-    Show-Stats
-}
-elseif ($args[0] -eq "recent") {
-    Show-Recent
-}
-elseif ($args[0] -eq "frequent") {
-    Show-Frequent
-}
-elseif ($args[0] -eq "remove" -and $args[1]) {
-    Remove-Bookmark -name $args[1]
-}
-elseif ($args[0] -eq "clear") {
-    Clear-Bookmarks
-}
-else {
-    Write-Host "Unknown command. Use 'hop help' for instructions." -ForegroundColor Red
-}
+
+    
