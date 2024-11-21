@@ -1,5 +1,42 @@
 $bookmarkFile = "$env:USERPROFILE\hop_bookmarks.txt"
 
+function Initialize-Hop {
+    param(
+        [switch]$Force
+    )
+
+    # Check for administrative privileges
+    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $admin = [Security.Principal.WindowsPrincipal]::new($currentUser)
+    
+    if (-not $admin.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)) {
+        Write-Host "Error: Hop initialization requires administrator privileges." -ForegroundColor Red
+        Write-Host "Please run PowerShell as an Administrator and try again." -ForegroundColor Yellow
+        return
+    }
+
+    # Get the current script's directory
+    $scriptDir = Split-Path -Parent $PSCommandPath
+
+    # Check if the script is already in PATH
+    $currentPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+    if ($currentPath -split ';' -contains $scriptDir -and -not $Force) {
+        Write-Host "Hop script directory is already in the system PATH." -ForegroundColor Green
+        return
+    }
+
+    try {
+        # Modify the machine-level PATH
+        $newPath = $currentPath + ";$scriptDir"
+        [Environment]::SetEnvironmentVariable("Path", $newPath, "Machine")
+
+        Write-Host "Hop script added to system PATH. Please restart your terminal or log off/log on for changes to take effect." -ForegroundColor Green
+    }
+    catch {
+        Write-Host "Error adding Hop script to PATH: $_" -ForegroundColor Red
+    }
+}
+
 function Load-Bookmarks {
     $bookmarks = @{}
     if (Test-Path $bookmarkFile) {
@@ -234,20 +271,50 @@ function Remove-Bookmark {
 }
 
 function Show-Help {
-    Write-Host " Usage:" -ForegroundColor Green
-    Write-Host "  hop add <name> <path> <category> - Adds a bookmark (default category: general)" -ForegroundColor White
-    Write-Host "  hop set <name>                   - Sets current location as a bookmark" -ForegroundColor White
-    Write-Host "  hop to <name>                    - Goes to the saved bookmark" -ForegroundColor White
-    Write-Host "  hop list <word>                  - Lists bookmarks with optional search word" -ForegroundColor White
-    Write-Host "  hop rename <oldname> <newname> -c <category>
-                                   - Renames name and/or category" -ForegroundColor White
-    Write-Host "  hop list -c <category>           - Lists bookmarks in a specific category" -ForegroundColor White
-    Write-Host "  hop stats                        - Displays detailed bookmark stats" -ForegroundColor White
-    Write-Host "  hop recent                       - Displays last 10 accessed bookmarks" -ForegroundColor White
-    Write-Host "  hop frequent                     - Displays top 10 frequently accessed bookmarks" -ForegroundColor White
-    Write-Host "  hop remove <name>                - Removes a specific bookmark" -ForegroundColor White
-    Write-Host "  hop clear                        - Clears all bookmarks" -ForegroundColor White
-    Write-Host "  hop help                         - Displays this help" -ForegroundColor White
+    Write-Host "Hop Bookmark Management Help" -ForegroundColor Green
+    Write-Host "`nBookmark Management:" -ForegroundColor Cyan
+    Write-Host "  hop add <name> <path> [<category>]" -ForegroundColor White -NoNewline
+    Write-Host "    - Add a new bookmark (default category: general)" 
+    
+    Write-Host "  hop set <name> [<category>]" -ForegroundColor White -NoNewline
+    Write-Host "        - Set current location as a bookmark"
+    
+    Write-Host "  hop to <name>" -ForegroundColor White -NoNewline
+    Write-Host "                   - Navigate to a saved bookmark"
+    
+    Write-Host "  hop rename <oldname> [<newname>] [-c <category>]" -ForegroundColor White -NoNewline
+    Write-Host " - Rename bookmark or change its category"
+
+    Write-Host "`nListing and Searching:" -ForegroundColor Cyan
+    Write-Host "  hop list [<word>]" -ForegroundColor White -NoNewline
+    Write-Host "               - List all bookmarks or search by keyword"
+    
+    Write-Host "  hop list -c <category>" -ForegroundColor White -NoNewline
+    Write-Host "        - List bookmarks in a specific category"
+
+    Write-Host "`nAnalytics and Management:" -ForegroundColor Cyan
+    Write-Host "  hop stats" -ForegroundColor White -NoNewline
+    Write-Host "                  - Display detailed bookmark statistics"
+    
+    Write-Host "  hop recent" -ForegroundColor White -NoNewline
+    Write-Host "               - Show 10 most recently accessed bookmarks"
+    
+    Write-Host "  hop frequent" -ForegroundColor White -NoNewline
+    Write-Host "           - Show 10 most frequently accessed bookmarks"
+    
+    Write-Host "  hop remove <name>" -ForegroundColor White -NoNewline
+    Write-Host "         - Remove a specific bookmark"
+    
+    Write-Host "  hop clear" -ForegroundColor White -NoNewline
+    Write-Host "                 - Clear all bookmarks (with confirmation)"
+
+    Write-Host "`nUtility:" -ForegroundColor Cyan
+    Write-Host "  hop help" -ForegroundColor White -NoNewline
+    Write-Host "                  - Display this help information"
+
+    Write-Host "`nTips:" -ForegroundColor Cyan
+    Write-Host "  - Use quotes around paths or names with spaces" -ForegroundColor DarkGray
+    Write-Host "  - Optional arguments are shown in square brackets" -ForegroundColor DarkGray
 }
 # Enhanced switch case with more robust error handling
 switch ($args[0]) {
@@ -307,6 +374,7 @@ switch ($args[0]) {
     }
     "stats" { Show-Stats }
     "recent" { Show-Recent }
+    "init" { Initialize-Hop }
     "frequent" { Show-Frequent }
     "remove" { 
         if ($args.Length -ge 2) {
