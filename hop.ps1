@@ -5,7 +5,6 @@ function Initialize-Hop {
         [switch]$Force
     )
 
-    # Check for administrative privileges
     $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
     $admin = [Security.Principal.WindowsPrincipal]::new($currentUser)
     
@@ -15,10 +14,8 @@ function Initialize-Hop {
         return
     }
 
-    # Get the current script's directory
     $scriptDir = Split-Path -Parent $PSCommandPath
 
-    # Check if the script is already in PATH
     $currentPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
     if ($currentPath -split ';' -contains $scriptDir -and -not $Force) {
         Write-Host "Hop script directory is already in the system PATH." -ForegroundColor Green
@@ -26,7 +23,7 @@ function Initialize-Hop {
     }
 
     try {
-        # Modify the machine-level PATH
+
         $newPath = $currentPath + ";$scriptDir"
         [Environment]::SetEnvironmentVariable("Path", $newPath, "Machine")
 
@@ -316,7 +313,7 @@ function Show-Help {
     Write-Host "  - Use quotes around paths or names with spaces" -ForegroundColor DarkGray
     Write-Host "  - Optional arguments are shown in square brackets" -ForegroundColor DarkGray
 }
-# Enhanced switch case with more robust error handling
+
 switch ($args[0]) {
     { $_ -eq $null } { Show-Help }
     "help" { Show-Help }
@@ -394,17 +391,17 @@ switch ($args[0]) {
         $oldName = $args[1]
 
         if ($args.Contains("-c")) {
-            # If "-c" is present, get newName (if available) and newCategory
+   
             $newName = if ($args[2] -ne "-c") { $args[2] } elseif ($args[4]) { $args[4] } else { $null }
             $newCategory = $args[$args.IndexOf("-c") + 1]
         } 
         else {
-            # If "-c" is not present, treat the second argument as newName
+
             $newName = $args[2]
             $newCategory = $null
         }
 
-        # Validate oldName and call Rename-Bookmark with relevant arguments
+
         if ($oldName) {
             try {
                 Rename-Bookmark -oldName $oldName -newName $newName -Category:($newCategory -ne $null) -newCategory $newCategory
